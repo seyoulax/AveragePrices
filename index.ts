@@ -1,4 +1,4 @@
-//Начало проекта
+/*НАЧАЛО ПРОЕКТА*/
 
 //импортим библиотеки
 const axios = require('axios')
@@ -8,6 +8,14 @@ const papa = require('papaparse')
 interface IAuth {
     user: string
     password: string
+}
+//интерфейс хэдеров запроса
+interface IHeaders{
+    [key: string] : string
+}
+//интрефейс даты среднего арифметического
+interface IAverageData{
+    average: string
 }
 
 //импортим обьект с данными на авторизацию
@@ -21,7 +29,7 @@ const correct_values: Array<string> = ['+7', 'self-pickup']
 
 //функция для хэширования данных авторизации
 function SetAuthHash(AuthData: IAuth): string {
-    let authString = `${AuthData.user}:${AuthData.password}` 
+    let authString: string = `${AuthData.user}:${AuthData.password}` 
     return `Basic ${btoa(authString)}`
 }
 
@@ -35,12 +43,47 @@ function PickNeedfulOrders(data: Order, correct_values: Array<string>) : number[
             proper_prices.push(Number(CData[5]))
         }
     }
-    console.log(proper_prices)
     return proper_prices
     
 }
+//функция для подсчета среднего среди значений массива
+function CountAverage(data: number[]) : number {
+    let summ: number = 0
+    let d_length: number = data.length
+    if(data.length == 0){
+        return summ
+    } else {
+        for(let i = 0; i < data.length; i++){
+            summ += data[i]
+        }
+        let average: number = summ / d_length
+        return parseFloat(average.toFixed(2))
+    }
+}
+//функция для отправки результата
+function SendAverage(PricesAverage: number) : void{
+    let dataJson: string = JSON.stringify({average : `${PricesAverage}`}) 
+    const headers_: IHeaders = {
+        'Content-Type': 'application/json',
+        'Authorization': SetAuthHash(AuthData)
+    }
+    axios.post('https://apply.leadball.app/reports', dataJson, { headers: headers_ }).then(
+        (res) => { console.log(
+                `{
+                    "status": OK,
+                    result: ${Object.values(res)} 
+                }`
+            )
+        }).catch( (err) => {
+            console.log(`{
+                "status": FALSE,
+                code_error: ${Object.values(err)} 
+            }`)
+        })
+                
+}
 //запрос на получение получение всех заказов (а также весь остальной функционал)
-function ReceiveData() : void {
+function ReceiveAndWorkWData() : void {
     //гет запрос на получение всех основных данных
    axios.get('https://apply.leadball.app/orders', { headers: { "Authorization" : SetAuthHash(AuthData), "content-type" : "text/csv"}}).then( 
         (res) =>
@@ -50,7 +93,11 @@ function ReceiveData() : void {
                 //парсим строчку csv на массив (с помощью специльной библиотеки papaparser) 
                 let OrdersData = papa.parse(CsvString)
                 //вызываем функцию нахождения всех походящих нам сумм заказов
-                PickNeedfulOrders(OrdersData.data, correct_values)
+                let PricesArr: number[] = PickNeedfulOrders(OrdersData.data, correct_values)
+                //считаем среднее по суммам заказов
+                let PricesAverage: number = CountAverage(PricesArr)
+                //вызываем функции для отправки результата
+                SendAverage(PricesAverage)
             }
    ).catch( 
         (err) => 
@@ -67,4 +114,5 @@ function ReceiveData() : void {
    )
 }
 
-ReceiveData()
+//вызываем основную функцию
+ReceiveAndWorkWData();
